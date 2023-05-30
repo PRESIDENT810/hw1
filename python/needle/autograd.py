@@ -48,7 +48,7 @@ class Op:
     def __call__(self, *args):
         raise NotImplementedError()
 
-    def compute(self, *args: Tuple[NDArray]):
+    def compute(self, *args: Tuple[NDArray]) -> NDArray:
         """Calculate forward pass of operator.
 
         Parameters
