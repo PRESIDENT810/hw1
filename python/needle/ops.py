@@ -15,6 +15,17 @@ import numpy
 import numpy as array_api
 
 
+def reduce_as(input_shape: list, output_shape: list, tensor: Tensor):
+    input_shape = [1] * (len(output_shape) - len(input_shape)) + input_shape
+    reduce_axes = []
+    for i in range(len(output_shape)):
+        if input_shape[i] == 1:
+            reduce_axes.append(i)
+            continue
+    if len(reduce_axes) == 0:
+        return tensor
+    return reshape(summation(tensor, axes=tuple(reduce_axes)), input_shape)
+
 class EWiseAdd(TensorOp):
     def compute(self, a: NDArray, b: NDArray) -> NDArray:
         return a + b
@@ -63,7 +74,7 @@ class MulScalar(TensorOp):
         return a * self.scalar
 
     def gradient(self, out_grad: Tensor, node: Tensor):
-        return (out_grad * self.scalar,)
+        return out_grad * self.scalar,
 
 
 def mul_scalar(a, scalar):
@@ -77,7 +88,7 @@ class PowerScalar(TensorOp):
         self.scalar = scalar
 
     def compute(self, a: NDArray) -> NDArray:
-        return a*self.scalar
+        return array_api.power(a, self.scalar)
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
@@ -95,10 +106,9 @@ class EWiseDiv(TensorOp):
     def compute(self, a: NDArray, b: NDArray) -> NDArray:
         return a/b
 
-    def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+    def gradient(self, out_grad, node: Tensor):
+        a, b = node.inputs
+        return out_grad/b, -1*out_grad*a/(b**2)
 
 
 def divide(a, b):
@@ -113,9 +123,8 @@ class DivScalar(TensorOp):
         return a/self.scalar
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        a: Tensor = node.inputs[0]
+        return (a/a/self.scalar)*out_grad
 
 
 def divide_scalar(a, scalar):
@@ -135,9 +144,7 @@ class Transpose(TensorOp):
         return array_api.transpose(a, axes=axes)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        return transpose(out_grad, self.axes)
 
 
 def transpose(a, axes=None):
@@ -152,9 +159,7 @@ class Reshape(TensorOp):
         return a.reshape(self.shape)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        return reshape(out_grad, node.inputs[0].shape)
 
 
 def reshape(a, shape):
@@ -169,9 +174,9 @@ class BroadcastTo(TensorOp):
         return array_api.broadcast_to(a, self.shape)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        input_shape = list(node.inputs[0].shape)
+        output_shape = list(out_grad.shape)
+        return reduce_as(input_shape, output_shape, out_grad)
 
 
 def broadcast_to(a, shape):
@@ -186,10 +191,8 @@ class Summation(TensorOp):
         return array_api.sum(a, axis=self.axes)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
-
+        a = node.inputs[0]
+        return a/a
 
 def summation(a, axes=None):
     return Summation(axes)(a)
@@ -200,9 +203,12 @@ class MatMul(TensorOp):
         return a@b
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        a, b = node.inputs
+        a_grad = out_grad@transpose(b)
+        a_grad = reduce_as(list(a.shape), list(a_grad.shape), a_grad)
+        b_grad = transpose(a)@out_grad
+        b_grad = reduce_as(list(b.shape), list(b_grad.shape), b_grad)
+        return a_grad, b_grad
 
 
 def matmul(a, b):
@@ -214,9 +220,8 @@ class Negate(TensorOp):
         return a*-1
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        a = node.inputs[0]
+        return -1*out_grad*a/a
 
 
 def negate(a):
