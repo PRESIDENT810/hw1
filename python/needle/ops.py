@@ -26,6 +26,7 @@ def reduce_as(input_shape: list, output_shape: list, tensor: Tensor):
         return tensor
     return reshape(summation(tensor, axes=tuple(reduce_axes)), input_shape)
 
+
 class EWiseAdd(TensorOp):
     def compute(self, a: NDArray, b: NDArray) -> NDArray:
         return a + b
@@ -104,11 +105,11 @@ class EWiseDiv(TensorOp):
     """Op to element-wise divide two nodes."""
 
     def compute(self, a: NDArray, b: NDArray) -> NDArray:
-        return a/b
+        return a / b
 
     def gradient(self, out_grad, node: Tensor):
         a, b = node.inputs
-        return out_grad/b, -1*out_grad*a/(b**2)
+        return out_grad / b, -1 * out_grad * a / (b ** 2)
 
 
 def divide(a, b):
@@ -120,11 +121,11 @@ class DivScalar(TensorOp):
         self.scalar = scalar
 
     def compute(self, a: NDArray) -> NDArray:
-        return a/self.scalar
+        return a / self.scalar
 
     def gradient(self, out_grad, node):
         a: Tensor = node.inputs[0]
-        return (a/a/self.scalar)*out_grad
+        return (a / a / self.scalar) * out_grad
 
 
 def divide_scalar(a, scalar):
@@ -192,7 +193,8 @@ class Summation(TensorOp):
 
     def gradient(self, out_grad, node):
         a = node.inputs[0]
-        return a/a
+        return a / a
+
 
 def summation(a, axes=None):
     return Summation(axes)(a)
@@ -200,13 +202,13 @@ def summation(a, axes=None):
 
 class MatMul(TensorOp):
     def compute(self, a: NDArray, b: NDArray) -> NDArray:
-        return a@b
+        return a @ b
 
     def gradient(self, out_grad, node):
         a, b = node.inputs
-        a_grad = out_grad@transpose(b)
+        a_grad = out_grad @ transpose(b)
         a_grad = reduce_as(list(a.shape), list(a_grad.shape), a_grad)
-        b_grad = transpose(a)@out_grad
+        b_grad = transpose(a) @ out_grad
         b_grad = reduce_as(list(b.shape), list(b_grad.shape), b_grad)
         return a_grad, b_grad
 
@@ -217,11 +219,11 @@ def matmul(a, b):
 
 class Negate(TensorOp):
     def compute(self, a: NDArray) -> NDArray:
-        return a*-1
+        return a * -1
 
     def gradient(self, out_grad, node):
         a = node.inputs[0]
-        return -1*out_grad*a/a
+        return -1 * out_grad * a / a
 
 
 def negate(a):
@@ -269,4 +271,3 @@ class ReLU(TensorOp):
 
 def relu(a):
     return ReLU()(a)
-

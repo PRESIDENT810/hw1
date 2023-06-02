@@ -11,6 +11,7 @@ TENSOR_COUNTER = 0
 # NOTE: we will import numpy as the array_api
 # as the backend for our computations, this line will change in later homeworks
 import numpy as array_api
+
 NDArray = numpy.ndarray
 
 
@@ -33,9 +34,11 @@ class CPUDevice(Device):
     def enabled(self):
         return True
 
+
 def cpu():
     """Return cpu device"""
     return CPUDevice()
+
 
 def all_devices():
     """return a list of all available devices"""
@@ -65,7 +68,7 @@ class Op:
         raise NotImplementedError()
 
     def gradient(
-        self, out_grad: "Value", node: "Value"
+            self, out_grad: "Value", node: "Value"
     ) -> Union["Value", Tuple["Value"]]:
         """Compute partial adjoint for each input value for a given output adjoint.
 
@@ -140,13 +143,13 @@ class Value:
         TENSOR_COUNTER -= 1
 
     def _init(
-        self,
-        op: Optional[Op],
-        inputs: List["Tensor"],
-        *,
-        num_outputs: int = 1,
-        cached_data: List[object] = None,
-        requires_grad: Optional[bool] = None
+            self,
+            op: Optional[Op],
+            inputs: List["Tensor"],
+            *,
+            num_outputs: int = 1,
+            cached_data: List[object] = None,
+            requires_grad: Optional[bool] = None
     ):
         global TENSOR_COUNTER
         TENSOR_COUNTER += 1
@@ -218,13 +221,13 @@ class Tensor(Value):
     grad: "Tensor"
 
     def __init__(
-        self,
-        array,
-        *,
-        device: Optional[Device] = None,
-        dtype=None,
-        requires_grad=True,
-        **kwargs
+            self,
+            array,
+            *,
+            device: Optional[Device] = None,
+            dtype=None,
+            requires_grad=True,
+            **kwargs
     ):
         if isinstance(array, Tensor):
             if device is None:
@@ -387,19 +390,42 @@ def compute_gradient_of_variables(output_tensor, out_grad):
 
     Store the computed result in the grad field of each Variable.
     """
-    # a map from node to a list of gradient contributions from each output node
-    node_to_output_grads_list: Dict[Tensor, List[Tensor]] = {}
+    # a map from node to a list of gradient contributions from each output node (partial adjoint to each output)
+    # node_to_output_grads_list[node_i] = [adjoint_ij1, adjoint_ij2...] for all i -> j
+    # if there is only one output, then this key has only adjoint as its corresponding value
+    # Suppose we have i -> [j1, j2...];
+    # adjoint_i = d(loss) / d(node_i), by triangle rule we have:
+    # adjoint_i = sum([adjoint_ij]) for all i -> j, and by chain rule we have
+    # adjoint_ij = (d(loss) / d(node_j)) * (d(node_j) / d(node_i)), which is equivalent to
+    # adjoint_ij = adjoint_j * (d(node_j) / d(node_i))
+    # Note: if i only have one output j, we have adjoint_i = adjoint_ij
+    node_to_output_grads_list: Dict[Tensor, List[Tensor]] = {output_tensor: [out_grad]}
     # Special note on initializing gradient of
     # We are really taking a derivative of the scalar reduce_sum(output_node)
     # instead of the vector output_node. But this is the common case for loss function.
-    node_to_output_grads_list[output_tensor] = [out_grad]
 
     # Traverse graph in reverse topological order given the output_node that we are taking gradient wrt.
-    reverse_topo_order = list(reversed(find_topo_sort([output_tensor])))
+    reverse_topo_order: List[Tensor] = list(reversed(find_topo_sort([output_tensor])))
 
-    ### BEGIN YOUR SOLUTION
-    raise NotImplementedError()
-    ### END YOUR SOLUTION
+    for node_i in reverse_topo_order:
+        # adjoint_i = sum([adjoint_ij]) for all i -> j
+        adjoint_i = sum(node_to_output_grads_list[node_i])
+        node_i.grad = adjoint_i
+        if len(node_i.inputs) == 0:
+            continue
+        adjoints = node_i.op.gradient(adjoint_i, node_i)
+        inputs = node_i.inputs
+        if not isinstance(adjoints, tuple):
+            adjoints = [adjoints]
+        else:
+            adjoints = list(adjoints)
+        inputs = list(inputs)
+        for i in range(len(inputs)):
+            node_k = inputs[i]
+            adjoint_ki = adjoints[i]
+            node_to_output_grads_list[node_k] = node_to_output_grads_list.get(node_k, [])
+            node_to_output_grads_list[node_k].append(adjoint_ki)
+
 
 
 def find_topo_sort(node_list: List[Value]) -> List[Value]:
