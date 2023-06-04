@@ -270,9 +270,10 @@ class ReLU(TensorOp):
         return np.maximum(0, a)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        raise NotImplementedError()
-        ### END YOUR SOLUTION
+        a = node.inputs[0]
+        if isinstance(a, Tensor):
+            a = a.realize_cached_data()
+        return out_grad * Tensor(np.where(a < 0, 0, 1))
 
 
 def relu(a):
